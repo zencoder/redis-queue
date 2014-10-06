@@ -47,15 +47,12 @@ func CreateMultiQueueConnection(connections []redis.Conn, key string) (MultiQueu
 		queues[index] = ErrorDecayQueue{conn:conn, error_rating:0.0, error_rating_time:time.Now().Unix()}
 	}
 
-	healthy_queues := make([]ErrorDecayQueue, len(connections))
-	copy(queues, healthy_queues)
-	
 	return MultiQueue{key:key, queues:queues}
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied 
 // key and value.  An error will be returned if the operation failed.
-func MultiPush(multi_queue MultiQueue, value string) (error) {
+func MultiPush(multi_queue *MultiQueue, value string) (error) {
 	selected_queue, err := SelectHealthyQueue(multi_queue)
 	if err != nil {
 		return err
@@ -72,7 +69,7 @@ func MultiPush(multi_queue MultiQueue, value string) (error) {
 
 // Pop will perform a blocking left-pop from a Redis list/queue with the supplied 
 // key.  An error will be returned if the operation failed.
-func MultiPop(multi_queue MultiQueue, timeout int) (string, error) {
+func MultiPop(multi_queue *MultiQueue, timeout int) (string, error) {
 	selected_queue, err := SelectHealthyQueue(multi_queue)
 	if err != nil {
 		return "", err
@@ -88,7 +85,7 @@ func MultiPop(multi_queue MultiQueue, timeout int) (string, error) {
 }
 
 // Length will return the number of items in the specified list/queue
-func MultiLength(multi_queue MultiQueue) (int, error) {
+func MultiLength(multi_queue *MultiQueue) (int, error) {
 	count := 0
 	for _, queue := range multi_queue.queues {
 		rep, err := redis.Int(queue.conn.Do("LLEN", multi_queue.key))

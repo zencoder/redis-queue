@@ -32,7 +32,7 @@ type MultiQueue struct {
 	queues []ErrorDecayQueue
 }
 
-func HealthyQueues (multi_queue MultiQueue) ([]ErrorDecayQueue) {
+func HealthyQueues (multi_queue *MultiQueue) ([]ErrorDecayQueue) {
 	now := time.Now().Unix()
 	healthy_queues := []ErrorDecayQueue{}
 	for _, queue := range multi_queue.queues {
@@ -46,15 +46,16 @@ func HealthyQueues (multi_queue MultiQueue) ([]ErrorDecayQueue) {
 	return healthy_queues
 }
 
-func SelectHealthyQueue(multi_queue MultiQueue) (ErrorDecayQueue, error) {
+func SelectHealthyQueue(multi_queue *MultiQueue) (*ErrorDecayQueue, error) {
 	healthy_queues := HealthyQueues(multi_queue)
 	number_of_healthy_queues := len(healthy_queues)
+
 	if number_of_healthy_queues == 0 {
-		return ErrorDecayQueue{}, errors.New("Unable to find a healthy queue to send to")
+		return &ErrorDecayQueue{}, errors.New("Unable to find a healthy queue to send to")
 	} else if number_of_healthy_queues == 1 {
-		return healthy_queues[0], nil
+		return &healthy_queues[0], nil
 	} else {
-		return healthy_queues[RandomInRange(0, number_of_healthy_queues - 1)], nil
+		return &healthy_queues[RandomInRange(0, number_of_healthy_queues - 1)], nil
 	}
 }
 
@@ -63,6 +64,6 @@ func RandomInRange(min, max int) int {
 	return rand.Intn(max - min) + min
 }
 
-func QueueError(queue ErrorDecayQueue) {
+func QueueError(queue *ErrorDecayQueue) {
 	queue.error_rating = queue.error_rating + 0.1
 }

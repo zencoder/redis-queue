@@ -9,7 +9,6 @@ Installation
 
 Install redis_queue using the "go get" command:
 
-    go get github.com/garyburd/redigo/redis
     go get github.com/skidder/redis_queue/redis_queue
 
 The Go distribution and [Redigo](https://github.com/garyburd/redigo) (a Go client for Redis) are the only dependencies.

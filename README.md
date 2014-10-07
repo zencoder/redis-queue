@@ -89,6 +89,10 @@ func main() {
 	// push a simple value to the queue
 	rq.MultiPush(&queue, "bar")
 	for {
+		// print queue length
+		length := rq.MultiLength(&queue)
+		fmt.Printf("Queue length: %d\n", length)
+
 		// remove an item from the queue
 		rep, _ := rq.MultiPop(&queue, 1)
 		if rep != "" {
@@ -98,7 +102,6 @@ func main() {
 		}
 	}
 }
-
 ```
 
 

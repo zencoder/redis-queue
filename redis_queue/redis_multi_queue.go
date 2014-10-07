@@ -80,15 +80,13 @@ func MultiPop(multi_queue *MultiQueue, timeout int) (string, error) {
 }
 
 // Length will return the number of items in the specified list/queue
-func MultiLength(multi_queue *MultiQueue) (int, error) {
+func MultiLength(multi_queue *MultiQueue) (int) {
 	count := 0
-	for _, queue := range multi_queue.queues {
+	for _, queue := range HealthyQueues(&multi_queue.queues) {
 		rep, err := redis.Int(queue.conn.Do("LLEN", multi_queue.key))
 		if err == nil {
 			count = count + rep
-		} else {
-			return count, err
 		}
 	}
-	return count, nil
+	return count
 }

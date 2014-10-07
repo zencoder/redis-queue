@@ -21,33 +21,24 @@ import redis "github.com/garyburd/redigo/redis"
 // Connect opens a connection to a Redis server and returns the connection.
 // The connection should be closed by invoking Disconnect(conn),
 // likely with defer.
-func MultiConnect(addresses []string) ([]redis.Conn, error) {
-	connections := make([]redis.Conn, len(addresses))
-	for index, address := range addresses {
+func MultiQueueConnect(addresses []string, key string) (MultiQueue) {
+	queues := []*ErrorDecayQueue{}
+	for _, address := range addresses {
 		conn, error := redis.Dial("tcp", address)
-		if error != nil {
-			return nil, error
+		if error == nil {
+			queues = append(queues, &ErrorDecayQueue{conn:conn, address:address, error_rating_time:time.Now().Unix(), error_rating:0.0})
+		} else {
+			// TODO: handle error connecting to Redis server
 		}
-		connections[index] = conn
 	}
-	return connections, nil
+	return MultiQueue{key:key, queues:queues}
 }
 
 // Close the Redis connection
-func MultiDisconnect(connections []redis.Conn) {
-	for _, conn := range connections {
-		conn.Close()
+func MultiQueueDisconnect(queue *MultiQueue) {
+	for _, queue := range queue.queues {
+		queue.conn.Close()
 	}
-}
-
-// Build a MultiQueueConnection structure for a specific queue
-func CreateMultiQueueConnection(connections []redis.Conn, key string) (MultiQueue) {	
-	queues := make([]ErrorDecayQueue, len(connections))
-	for index, conn := range connections {
-		queues[index] = ErrorDecayQueue{conn:conn, error_rating:0.0, error_rating_time:time.Now().Unix()}
-	}
-
-	return MultiQueue{key:key, queues:queues}
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied 
@@ -75,9 +66,13 @@ func MultiPop(multi_queue *MultiQueue, timeout int) (string, error) {
 		return "", err
 	}
 
-	rep, err := redis.Strings(selected_queue.conn.Do("BLPOP", multi_queue.key, timeout))
+	rep, err := selected_queue.conn.Do("BLPOP", multi_queue.key, timeout)
 	if err == nil {
-		return rep[1], nil
+		r, err := redis.Strings(rep, err)
+		if err == nil {
+			return r[1], nil
+		}
+		return "", err
 	} else {
 		QueueError(selected_queue)
 		return "", err

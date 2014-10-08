@@ -12,8 +12,8 @@
 // License for the specific language governing permissions and limitations
 // under the License.
 
-// Package redis_queue provides a simple queue abstraction that is backed by Redis.
-package redis_queue
+// Package rq provides a simple queue abstraction that is backed by Redis.
+package rq
 
 import "errors"
 import "math"

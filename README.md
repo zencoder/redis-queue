@@ -1,4 +1,4 @@
-redis_queue
+redis-queue
 ===========
 
 A Go implementation of a FIFO queue backed by Redis
@@ -7,9 +7,9 @@ A Go implementation of a FIFO queue backed by Redis
 Installation
 ------------
 
-Install redis_queue using the "go get" command:
+Install redis-queue using the "go get" command:
 
-    go get github.com/skidder/redis_queue/redis_queue
+    go get github.com/skidder/redis-queue/rq
 
 The Go distribution and [Redigo](https://github.com/garyburd/redigo) (a Go client for Redis) are the only dependencies.
 
@@ -25,7 +25,7 @@ package main
 import "flag"
 import "fmt"
 import "log"
-import rq "github.com/skidder/redis_queue/redis_queue"
+import rq "github.com/skidder/redis-queue/rq"
 
 var (
 	redisServer = flag.String("redisServer", ":6379", "Hostname and port for the Redis server")
@@ -72,7 +72,7 @@ package main
 
 import "fmt"
 import "log"
-import rq "github.com/skidder/redis_queue/redis_queue"
+import rq "github.com/skidder/redis-queue/rq"
 
 func main() {
 	addresses := make([]string, 2)
@@ -110,4 +110,4 @@ func main() {
 License
 -------
 
-redis_queue is available under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).
+redis-queue is available under the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0.html).

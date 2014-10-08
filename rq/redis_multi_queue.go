@@ -27,7 +27,7 @@ func MultiQueueConnect(addresses []string, key string) (MultiQueue, error) {
 	for _, address := range addresses {
 		conn, e := redis.Dial("tcp", address)
 		if e == nil {
-			queues = append(queues, &ErrorDecayQueue{conn:conn, address:address, error_rating_time:time.Now().Unix(), error_rating:0.0})
+			queues = append(queues, &ErrorDecayQueue{conn:conn, address:address, errorRatingTime:time.Now().Unix(), errorRating:0.0})
 		}
 	}
 

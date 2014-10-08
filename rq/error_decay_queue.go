@@ -24,8 +24,8 @@ import redis "github.com/garyburd/redigo/redis"
 type ErrorDecayQueue struct {
 	conn redis.Conn
 	address string
-	error_rating float64
-	error_rating_time int64
+	errorRating float64
+	errorRatingTime int64
 }
 
 type MultiQueue struct {
@@ -33,50 +33,50 @@ type MultiQueue struct {
 	queues []*ErrorDecayQueue
 }
 
-func (queue *MultiQueue) HealthyQueues() ([]*ErrorDecayQueue) {
+func (mq *MultiQueue) HealthyQueues() ([]*ErrorDecayQueue) {
 	now := time.Now().Unix()
-	healthy_queues := []*ErrorDecayQueue{}
-	for _, queue := range queue.queues {
-		time_delta := now - queue.error_rating_time
-		updated_error_rating := queue.error_rating * math.Exp((math.Log(0.5) / 10) * float64(time_delta))
+	healthyQueues := []*ErrorDecayQueue{}
+	for _, queue := range mq.queues {
+		timeDelta := now - queue.errorRatingTime
+		updatedErrorRating := queue.errorRating * math.Exp((math.Log(0.5) / 10) * float64(timeDelta))
 
-		if updated_error_rating < 0.1 {
-			if queue.error_rating >= 0.1 {
+		if updatedErrorRating < 0.1 {
+			if queue.errorRating >= 0.1 {
 				// transitioning the queue out of an unhealthy state, try reconnecting
 				queue.conn.Close()
 				conn, error := redis.Dial("tcp", queue.address)
 				if error == nil {
 					queue.conn = conn
-					healthy_queues = append(healthy_queues, queue)
+					healthyQueues = append(healthyQueues, queue)
 				}
 			} else {
-				healthy_queues = append(healthy_queues, queue)
+				healthyQueues = append(healthyQueues, queue)
 			}
 		}
-		queue.error_rating_time = time.Now().Unix()
-		queue.error_rating = updated_error_rating
+		queue.errorRatingTime = time.Now().Unix()
+		queue.errorRating = updatedErrorRating
 	}
-	return healthy_queues
+	return healthyQueues
 }
 
-func (multi_queue *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
-	healthy_queues := multi_queue.HealthyQueues()
-	number_of_healthy_queues := len(healthy_queues)
+func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
+	healthyQueues := mq.HealthyQueues()
+	numberOfHealthyQueues := len(healthyQueues)
 
 	index := 0
-	if number_of_healthy_queues == 0 {
-		number_of_queues := len(multi_queue.queues)
-		if number_of_queues == 0 {
+	if numberOfHealthyQueues == 0 {
+		numberOfQueues := len(mq.queues)
+		if numberOfQueues == 0 {
 			return nil, errors.New("No queues available")
 		}
-		index = rand.Intn(number_of_queues)
-		return multi_queue.queues[index], nil
-	} else if number_of_healthy_queues > 1 {
-		index = rand.Intn(number_of_healthy_queues)
+		index = rand.Intn(numberOfQueues)
+		return mq.queues[index], nil
+	} else if numberOfHealthyQueues > 1 {
+		index = rand.Intn(numberOfHealthyQueues)
 	}
-	return healthy_queues[index], nil
+	return healthyQueues[index], nil
 }
 
 func (queue *ErrorDecayQueue) QueueError() {
-	queue.error_rating = queue.error_rating + 0.1
+	queue.errorRating = queue.errorRating + 0.1
 }

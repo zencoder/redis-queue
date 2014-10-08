@@ -15,27 +15,31 @@
 // Package redis_queue provides a simple queue abstraction that is backed by Redis.
 package redis_queue
 
+import "errors"
 import "time"
 import redis "github.com/garyburd/redigo/redis"
 
 // Connect opens a connection to a Redis server and returns the connection.
 // The connection should be closed by invoking Disconnect(conn),
 // likely with defer.
-func MultiQueueConnect(addresses []string, key string) (MultiQueue) {
+func MultiQueueConnect(addresses []string, key string) (MultiQueue, error) {
 	queues := []*ErrorDecayQueue{}
 	for _, address := range addresses {
-		conn, error := redis.Dial("tcp", address)
-		if error == nil {
+		conn, e := redis.Dial("tcp", address)
+		if e == nil {
 			queues = append(queues, &ErrorDecayQueue{conn:conn, address:address, error_rating_time:time.Now().Unix(), error_rating:0.0})
-		} else {
-			// TODO: handle error connecting to Redis server
 		}
 	}
-	return MultiQueue{key:key, queues:queues}
+
+	if (len(queues) == 0) {
+		return MultiQueue{}, errors.New("No queue connections could be made")
+	} else {
+		return MultiQueue{key:key, queues:queues}, nil
+	}
 }
 
 // Close the Redis connection
-func MultiQueueDisconnect(queue *MultiQueue) {
+func (queue *MultiQueue) MultiQueueDisconnect() {
 	for _, queue := range queue.queues {
 		queue.conn.Close()
 	}
@@ -43,8 +47,8 @@ func MultiQueueDisconnect(queue *MultiQueue) {
 
 // Push will perform a right-push onto a Redis list/queue with the supplied 
 // key and value.  An error will be returned if the operation failed.
-func MultiPush(multi_queue *MultiQueue, value string) (error) {
-	selected_queue, err := SelectHealthyQueue(multi_queue)
+func (multi_queue *MultiQueue) MultiPush(value string) (error) {
+	selected_queue, err := multi_queue.SelectHealthyQueue()
 	if err != nil {
 		return err
 	}
@@ -53,15 +57,15 @@ func MultiPush(multi_queue *MultiQueue, value string) (error) {
 	if push_error == nil {
 		return selected_queue.conn.Flush()
 	} else {
-		QueueError(selected_queue)
+		selected_queue.QueueError()
 		return push_error
 	}
 }
 
 // Pop will perform a blocking left-pop from a Redis list/queue with the supplied 
 // key.  An error will be returned if the operation failed.
-func MultiPop(multi_queue *MultiQueue, timeout int) (string, error) {
-	selected_queue, err := SelectHealthyQueue(multi_queue)
+func (multi_queue *MultiQueue) MultiPop(timeout int) (string, error) {
+	selected_queue, err := multi_queue.SelectHealthyQueue()
 	if err != nil {
 		return "", err
 	}
@@ -74,15 +78,15 @@ func MultiPop(multi_queue *MultiQueue, timeout int) (string, error) {
 		}
 		return "", err
 	} else {
-		QueueError(selected_queue)
+		selected_queue.QueueError()
 		return "", err
 	}
 }
 
 // Length will return the number of items in the specified list/queue
-func MultiLength(multi_queue *MultiQueue) (int) {
+func (multi_queue *MultiQueue) MultiLength() (int) {
 	count := 0
-	for _, queue := range HealthyQueues(&multi_queue.queues) {
+	for _, queue := range multi_queue.HealthyQueues() {
 		rep, err := redis.Int(queue.conn.Do("LLEN", multi_queue.key))
 		if err == nil {
 			count = count + rep

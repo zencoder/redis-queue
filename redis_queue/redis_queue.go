@@ -22,26 +22,20 @@ type Queue struct {
 	key string
 }
 
-// Connect opens a connection to a Redis server and returns the connection.
-// The connection should be closed by invoking Disconnect(conn),
-// likely with defer.
-func Connect(address string) (redis.Conn, error) {
-	return redis.Dial("tcp", address)
+func Connect(address string, key string) (Queue, error) {
+	conn, error := redis.Dial("tcp", address)
+	return Queue{conn:conn, key:key}, error
 }
 
 // Close the Redis connection
-func Disconnect(conn redis.Conn) {
-	conn.Close()
+func (queue *Queue) Disconnect() {
+	queue.conn.Close()
 }
 
-
-func CreateQueueConnection(conn redis.Conn, key string) (Queue) {
-	return Queue{conn:conn, key:key}
-}
 
 // Push will perform a right-push onto a Redis list/queue with the supplied 
 // key and value.  An error will be returned if the operation failed.
-func Push(queue *Queue, value string) (error) {
+func (queue *Queue) Push(value string) (error) {
 	err := queue.conn.Send("RPUSH", queue.key, value)
 	if err == nil {
 		return queue.conn.Flush()
@@ -52,7 +46,7 @@ func Push(queue *Queue, value string) (error) {
 
 // Pop will perform a blocking left-pop from a Redis list/queue with the supplied 
 // key.  An error will be returned if the operation failed.
-func Pop(queue *Queue, timeout int) (string, error) {
+func (queue *Queue) Pop(timeout int) (string, error) {
 	rep, err := redis.Strings(queue.conn.Do("BLPOP", queue.key, timeout))
 	if err == nil {
 		return rep[1], nil
@@ -62,7 +56,7 @@ func Pop(queue *Queue, timeout int) (string, error) {
 }
 
 // Length will return the number of items in the specified list/queue
-func Length(queue *Queue) (int, error) {
+func (queue *Queue) Length() (int, error) {
 	rep, err := redis.Int(queue.conn.Do("LLEN", queue.key))
 	if err == nil {
 		return rep, nil

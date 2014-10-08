@@ -23,8 +23,8 @@ Samples
 package main
 
 import "flag"
+import "fmt"
 import "log"
-import format "fmt"
 import rq "github.com/skidder/redis_queue/redis_queue"
 
 var (
@@ -35,34 +35,32 @@ var (
 func main() {
 	flag.Parse();
 
-	format.Printf("redisServer: %s\n", *redisServer)
-	format.Printf("redisPassword: %s\n", *redisPassword)
-
-	conn, err := rq.Connect(*redisServer)
-	if err != nil {
-		// handle it
-	}
+	fmt.Printf("redisServer: %s\n", *redisServer)
+	fmt.Printf("redisPassword: %s\n", *redisPassword)
 
 	queue_name := "example"
-	queue := rq.CreateQueueConnection(conn, queue_name)
+	q, err := rq.Connect(*redisServer, queue_name)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// ensure the connection is closed on exit
-	defer rq.Disconnect(conn)
+	defer q.Disconnect()
 
 	// push a simple value to the queue
-	rq.Push(&queue, "bar")
+	q.Push("bar")
 	for {
 		// print queue length
-		length, err := rq.Length(&queue)
-		format.Printf("%s: length: %d\n", queue_name, length)
+		length, err := q.Length()
+		fmt.Printf("%s: length: %d\n", queue_name, length)
 
 		// remove an item from the queue
-		rep, err := rq.Pop(&queue, 0)
+		rep, err := q.Pop(0)
 		if err != nil {
 			log.Println(err)
 			log.Fatalf("Uh no!")
 		}
-		format.Printf("%s: message: %s\n", queue_name, rep)
+		fmt.Printf("%s: message: %s\n", queue_name, rep)
 	}
 }
 ```
@@ -73,6 +71,7 @@ func main() {
 package main
 
 import "fmt"
+import "log"
 import rq "github.com/skidder/redis_queue/redis_queue"
 
 func main() {
@@ -81,20 +80,23 @@ func main() {
 	addresses[1] = ":8777"
 
 	queue_name := "example"
-	queue:= rq.MultiQueueConnect(addresses, queue_name)
+	queue, error := rq.MultiQueueConnect(addresses, queue_name)
+	if error != nil {
+		log.Fatal(error)
+	}
 
 	// ensure the connection is closed on exit
-	defer rq.MultiQueueDisconnect(&queue)
+	defer queue.MultiQueueDisconnect()
 
 	// push a simple value to the queue
-	rq.MultiPush(&queue, "bar")
+	queue.MultiPush("bar")
 	for {
 		// print queue length
-		length := rq.MultiLength(&queue)
-		fmt.Printf("Queue length: %d\n", length)
+		length  := queue.MultiLength()
+		fmt.Printf("%s: length: %d\n", queue_name, length)
 
 		// remove an item from the queue
-		rep, _ := rq.MultiPop(&queue, 1)
+		rep, _ := queue.MultiPop(1)
 		if rep != "" {
 			fmt.Printf("Received message: %s\n", rep)
 		} else {

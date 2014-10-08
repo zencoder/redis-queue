@@ -15,6 +15,7 @@
 // Package redis_queue provides a simple queue abstraction that is backed by Redis.
 package redis_queue
 
+import "errors"
 import "math"
 import "math/rand"
 import "time"
@@ -32,10 +33,10 @@ type MultiQueue struct {
 	queues []*ErrorDecayQueue
 }
 
-func HealthyQueues (queues *[]*ErrorDecayQueue) ([]*ErrorDecayQueue) {
+func (queue *MultiQueue) HealthyQueues() ([]*ErrorDecayQueue) {
 	now := time.Now().Unix()
 	healthy_queues := []*ErrorDecayQueue{}
-	for _, queue := range *queues {
+	for _, queue := range queue.queues {
 		time_delta := now - queue.error_rating_time
 		updated_error_rating := queue.error_rating * math.Exp((math.Log(0.5) / 10) * float64(time_delta))
 
@@ -58,13 +59,16 @@ func HealthyQueues (queues *[]*ErrorDecayQueue) ([]*ErrorDecayQueue) {
 	return healthy_queues
 }
 
-func SelectHealthyQueue(multi_queue *MultiQueue) (*ErrorDecayQueue, error) {
-	healthy_queues := HealthyQueues(&multi_queue.queues)
+func (multi_queue *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
+	healthy_queues := multi_queue.HealthyQueues()
 	number_of_healthy_queues := len(healthy_queues)
 
 	index := 0
 	if number_of_healthy_queues == 0 {
 		number_of_queues := len(multi_queue.queues)
+		if number_of_queues == 0 {
+			return nil, errors.New("No queues available")
+		}
 		index = rand.Intn(number_of_queues)
 		return multi_queue.queues[index], nil
 	} else if number_of_healthy_queues > 1 {
@@ -73,6 +77,6 @@ func SelectHealthyQueue(multi_queue *MultiQueue) (*ErrorDecayQueue, error) {
 	return healthy_queues[index], nil
 }
 
-func QueueError(queue *ErrorDecayQueue) {
+func (queue *ErrorDecayQueue) QueueError() {
 	queue.error_rating = queue.error_rating + 0.1
 }

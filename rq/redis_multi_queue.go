@@ -16,6 +16,8 @@
 package rq
 
 import "errors"
+import "log"
+import "strings"
 import "time"
 import redis "github.com/garyburd/redigo/redis"
 
@@ -23,11 +25,27 @@ import redis "github.com/garyburd/redigo/redis"
 // The connection should be closed by invoking Disconnect(conn),
 // likely with defer.
 func MultiQueueConnect(addresses []string, key string) (MultiQueue, error) {
+	if (len(addresses) == 0) {
+		return MultiQueue{}, errors.New("No connection addresses provided, aborting")
+	}
+
 	queues := []*ErrorDecayQueue{}
 	for _, address := range addresses {
-		conn, e := redis.Dial("tcp", address)
+		urlParts := strings.Split(address, "/")
+		log.Println("Connecting to Redis server: ", urlParts[0])
+		conn, e := redis.Dial("tcp", urlParts[0])
 		if e == nil {
 			queues = append(queues, &ErrorDecayQueue{conn:conn, address:address, errorRatingTime:time.Now().Unix(), errorRating:0.0})
+		} else {
+			log.Fatal(e)
+		}
+
+		if len(urlParts) == 2 {
+			log.Println("Selecting database: ", urlParts[1])
+			selectError := conn.Send("SELECT", urlParts[1])
+			if selectError != nil {
+				log.Fatal(selectError)
+			}
 		}
 	}
 

@@ -22,23 +22,23 @@ import "time"
 import redis "github.com/garyburd/redigo/redis"
 
 type ErrorDecayQueue struct {
-	conn redis.Conn
-	address string
-	errorRating float64
+	conn            redis.Conn
+	address         string
+	errorRating     float64
 	errorRatingTime int64
 }
 
 type MultiQueue struct {
-	key string
+	key    string
 	queues []*ErrorDecayQueue
 }
 
-func (mq *MultiQueue) HealthyQueues() ([]*ErrorDecayQueue) {
+func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 	now := time.Now().Unix()
 	healthyQueues := []*ErrorDecayQueue{}
 	for _, queue := range mq.queues {
 		timeDelta := now - queue.errorRatingTime
-		updatedErrorRating := queue.errorRating * math.Exp((math.Log(0.5) / 10) * float64(timeDelta))
+		updatedErrorRating := queue.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
 
 		if updatedErrorRating < 0.1 {
 			if queue.errorRating >= 0.1 {

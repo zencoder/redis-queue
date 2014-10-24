@@ -19,12 +19,12 @@ import redis "github.com/garyburd/redigo/redis"
 
 type Queue struct {
 	conn redis.Conn
-	key string
+	key  string
 }
 
 func Connect(address string, key string) (Queue, error) {
 	conn, error := redis.Dial("tcp", address)
-	return Queue{conn:conn, key:key}, error
+	return Queue{conn: conn, key: key}, error
 }
 
 // Close the Redis connection
@@ -32,10 +32,9 @@ func (queue *Queue) Disconnect() {
 	queue.conn.Close()
 }
 
-
-// Push will perform a right-push onto a Redis list/queue with the supplied 
+// Push will perform a right-push onto a Redis list/queue with the supplied
 // key and value.  An error will be returned if the operation failed.
-func (queue *Queue) Push(value string) (error) {
+func (queue *Queue) Push(value string) error {
 	err := queue.conn.Send("RPUSH", queue.key, value)
 	if err == nil {
 		return queue.conn.Flush()
@@ -44,7 +43,7 @@ func (queue *Queue) Push(value string) (error) {
 	}
 }
 
-// Pop will perform a blocking left-pop from a Redis list/queue with the supplied 
+// Pop will perform a blocking left-pop from a Redis list/queue with the supplied
 // key.  An error will be returned if the operation failed.
 func (queue *Queue) Pop(timeout int) (string, error) {
 	rep, err := redis.Strings(queue.conn.Do("BLPOP", queue.key, timeout))

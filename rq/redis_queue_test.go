@@ -26,12 +26,53 @@ func TestQueueConnectSuccessful(t *testing.T) {
 	}
 }
 
+func TestQueueConnectFailure(t *testing.T) {
+	_, err := QueueConnect(":123", "rq_test_queue")
+	if err == nil {
+		t.Error("Expected error connecting to Redis")
+	}
+}
+
 func TestQueueDisconnectSuccessful(t *testing.T) {
 	q, err := QueueConnect(":6379", "rq_test_queue")
 	q.Disconnect()
 	if err != nil {
 		t.Error("Error while disconnecting from Redis", err)
 	}
+}
+
+func TestQueuePushSuccessful(t *testing.T) {
+	q, _ := QueueConnect(":6379", "rq_test_queue")
+	err := q.Push("foo")
+	if err != nil {
+		t.Error("Error while pushing to Redis queue", err)
+	}
+	q.Disconnect()
+}
+
+func TestQueuePopSuccessful(t *testing.T) {
+	q, _ := QueueConnect(":6379", "rq_test_pop_queue")
+	q.Push("foo")
+	q.Push("bar")
+
+	var value string
+	var err error
+	value, err = q.Pop(1)
+	if value != "foo" {
+		t.Error("Expected foo but got: ", value)
+	}
+	if err != nil {
+		t.Error("Unexpected error: ", err)
+	}
+
+	value, err = q.Pop(1)
+	if value != "bar" {
+		t.Error("Expected bar but got: ", value)
+	}
+	if err != nil {
+		t.Error("Unexpected error: ", err)
+	}
+	q.Disconnect()
 }
 
 func BenchmarkQueueConnectDisconnect(b *testing.B) {
@@ -41,3 +82,10 @@ func BenchmarkQueueConnectDisconnect(b *testing.B) {
 	}
 }
 
+func BenchmarkQueuePush(b *testing.B) {
+	q, _ := QueueConnect(":6379", "rq_test_queue")
+	for i := 0; i < b.N; i++ {
+		q.Push("foo")
+	}
+	q.Disconnect()
+}

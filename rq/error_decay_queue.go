@@ -15,10 +15,6 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import "errors"
-import "math"
-import "math/rand"
-import "time"
 import redis "github.com/garyburd/redigo/redis"
 
 type ErrorDecayQueue struct {
@@ -26,55 +22,6 @@ type ErrorDecayQueue struct {
 	address         string
 	errorRating     float64
 	errorRatingTime int64
-}
-
-type MultiQueue struct {
-	key    string
-	queues []*ErrorDecayQueue
-}
-
-func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
-	now := time.Now().Unix()
-	healthyQueues := []*ErrorDecayQueue{}
-	for _, queue := range mq.queues {
-		timeDelta := now - queue.errorRatingTime
-		updatedErrorRating := queue.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
-
-		if updatedErrorRating < 0.1 {
-			if queue.errorRating >= 0.1 {
-				// transitioning the queue out of an unhealthy state, try reconnecting
-				queue.conn.Close()
-				conn, error := redis.Dial("tcp", queue.address)
-				if error == nil {
-					queue.conn = conn
-					healthyQueues = append(healthyQueues, queue)
-				}
-			} else {
-				healthyQueues = append(healthyQueues, queue)
-			}
-		}
-		queue.errorRatingTime = time.Now().Unix()
-		queue.errorRating = updatedErrorRating
-	}
-	return healthyQueues
-}
-
-func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
-	healthyQueues := mq.HealthyQueues()
-	numberOfHealthyQueues := len(healthyQueues)
-
-	index := 0
-	if numberOfHealthyQueues == 0 {
-		numberOfQueues := len(mq.queues)
-		if numberOfQueues == 0 {
-			return nil, errors.New("No queues available")
-		}
-		index = rand.Intn(numberOfQueues)
-		return mq.queues[index], nil
-	} else if numberOfHealthyQueues > 1 {
-		index = rand.Intn(numberOfHealthyQueues)
-	}
-	return healthyQueues[index], nil
 }
 
 func (queue *ErrorDecayQueue) QueueError() {

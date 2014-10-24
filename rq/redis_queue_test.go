@@ -20,10 +20,11 @@ import (
 )
 
 func TestQueueConnectSuccessful(t *testing.T) {
-	_, err := QueueConnect(":6379", "rq_test_queue")
+	q, err := QueueConnect(":6379", "rq_test_queue")
 	if err != nil {
 		t.Error("Error while connecting to Redis", err)
 	}
+	q.Disconnect()
 }
 
 func TestQueueConnectFailure(t *testing.T) {
@@ -108,17 +109,11 @@ func TestQueueLengthSuccessful(t *testing.T) {
 	q.Disconnect()
 }
 
-func BenchmarkQueueConnectDisconnect(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		q, _ := QueueConnect(":6379", "rq_test_queue")
-		q.Disconnect()
-	}
-}
-
-func BenchmarkQueuePush(b *testing.B) {
+func BenchmarkQueuePushPop(b *testing.B) {
 	q, _ := QueueConnect(":6379", "rq_test_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
+		q.Pop(1)
 	}
 	q.Disconnect()
 }

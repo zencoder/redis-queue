@@ -15,11 +15,20 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import "errors"
-import "log"
-import "strings"
-import "time"
-import redis "github.com/garyburd/redigo/redis"
+import (
+	"errors"
+	"github.com/garyburd/redigo/redis"
+	"log"
+	"math"
+	"math/rand"
+	"strings"
+	"time"
+)
+
+type MultiQueue struct {
+	key    string
+	queues []*ErrorDecayQueue
+}
 
 // Connect opens a connection to a Redis server and returns the connection.
 // The connection should be closed by invoking Disconnect(conn),
@@ -33,18 +42,18 @@ func MultiQueueConnect(addresses []string, key string) (MultiQueue, error) {
 	for _, address := range addresses {
 		urlParts := strings.Split(address, "/")
 		log.Println("Connecting to Redis server: ", urlParts[0])
-		conn, e := redis.Dial("tcp", urlParts[0])
-		if e == nil {
+		conn, connectErr := redis.Dial("tcp", urlParts[0])
+		if connectErr == nil {
 			queues = append(queues, &ErrorDecayQueue{conn: conn, address: address, errorRatingTime: time.Now().Unix(), errorRating: 0.0})
 		} else {
-			log.Fatal(e)
+			return MultiQueue{}, connectErr
 		}
 
 		if len(urlParts) == 2 {
 			log.Println("Selecting database: ", urlParts[1])
-			selectError := conn.Send("SELECT", urlParts[1])
-			if selectError != nil {
-				log.Fatal(selectError)
+			selectErr := conn.Send("SELECT", urlParts[1])
+			if selectErr != nil {
+				return MultiQueue{}, selectErr
 			}
 		}
 	}
@@ -57,15 +66,21 @@ func MultiQueueConnect(addresses []string, key string) (MultiQueue, error) {
 }
 
 // Close the Redis connection
-func (queue *MultiQueue) MultiQueueDisconnect() {
+func (queue *MultiQueue) Disconnect() error {
+	log.Println("Disconnecting from Redis servers")
+	var disconnectErr error
 	for _, queue := range queue.queues {
-		queue.conn.Close()
+		err := queue.conn.Close()
+		if err != nil {
+			disconnectErr = err
+		}
 	}
+	return disconnectErr
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied
 // key and value.  An error will be returned if the operation failed.
-func (multi_queue *MultiQueue) MultiPush(value string) error {
+func (multi_queue *MultiQueue) Push(value string) error {
 	selected_queue, err := multi_queue.SelectHealthyQueue()
 	if err != nil {
 		return err
@@ -82,7 +97,7 @@ func (multi_queue *MultiQueue) MultiPush(value string) error {
 
 // Pop will perform a blocking left-pop from a Redis list/queue with the supplied
 // key.  An error will be returned if the operation failed.
-func (multi_queue *MultiQueue) MultiPop(timeout int) (string, error) {
+func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	selected_queue, err := multi_queue.SelectHealthyQueue()
 	if err != nil {
 		return "", err
@@ -102,13 +117,59 @@ func (multi_queue *MultiQueue) MultiPop(timeout int) (string, error) {
 }
 
 // Length will return the number of items in the specified list/queue
-func (multi_queue *MultiQueue) MultiLength() int {
+func (multi_queue *MultiQueue) Length() (int, error) {
 	count := 0
 	for _, queue := range multi_queue.HealthyQueues() {
 		rep, err := redis.Int(queue.conn.Do("LLEN", multi_queue.key))
 		if err == nil {
 			count = count + rep
+		} else {
+			return count, err
 		}
 	}
-	return count
+	return count, nil
+}
+
+func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
+	now := time.Now().Unix()
+	healthyQueues := []*ErrorDecayQueue{}
+	for _, queue := range mq.queues {
+		timeDelta := now - queue.errorRatingTime
+		updatedErrorRating := queue.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
+
+		if updatedErrorRating < 0.1 {
+			if queue.errorRating >= 0.1 {
+				// transitioning the queue out of an unhealthy state, try reconnecting
+				queue.conn.Close()
+				conn, error := redis.Dial("tcp", queue.address)
+				if error == nil {
+					queue.conn = conn
+					healthyQueues = append(healthyQueues, queue)
+				}
+			} else {
+				healthyQueues = append(healthyQueues, queue)
+			}
+		}
+		queue.errorRatingTime = time.Now().Unix()
+		queue.errorRating = updatedErrorRating
+	}
+	return healthyQueues
+}
+
+func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
+	healthyQueues := mq.HealthyQueues()
+	numberOfHealthyQueues := len(healthyQueues)
+
+	index := 0
+	if numberOfHealthyQueues == 0 {
+		numberOfQueues := len(mq.queues)
+		if numberOfQueues == 0 {
+			return nil, errors.New("No queues available")
+		}
+		index = rand.Intn(numberOfQueues)
+		return mq.queues[index], nil
+	} else if numberOfHealthyQueues > 1 {
+		index = rand.Intn(numberOfHealthyQueues)
+	}
+	return healthyQueues[index], nil
 }

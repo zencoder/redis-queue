@@ -22,14 +22,16 @@ type Queue struct {
 	key  string
 }
 
-func Connect(address string, key string) (Queue, error) {
+// Connect to the Redis server at the specified address and create a queue
+// corresponding to the given key
+func QueueConnect(address string, key string) (Queue, error) {
 	conn, error := redis.Dial("tcp", address)
 	return Queue{conn: conn, key: key}, error
 }
 
 // Close the Redis connection
-func (queue *Queue) Disconnect() {
-	queue.conn.Close()
+func (queue *Queue) Disconnect() error {
+	return queue.conn.Close()
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied

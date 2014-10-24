@@ -30,6 +30,8 @@ type MultiQueue struct {
 	queues []*ErrorDecayQueue
 }
 
+var noQueuesAvailableError = errors.New("No queues available")
+
 // Connect opens a connection to a Redis server and returns the connection.
 // The connection should be closed by invoking Disconnect(conn),
 // likely with defer.
@@ -164,7 +166,7 @@ func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
 	if numberOfHealthyQueues == 0 {
 		numberOfQueues := len(mq.queues)
 		if numberOfQueues == 0 {
-			return nil, errors.New("No queues available")
+			return nil, noQueuesAvailableError
 		}
 		index = rand.Intn(numberOfQueues)
 		return mq.queues[index], nil

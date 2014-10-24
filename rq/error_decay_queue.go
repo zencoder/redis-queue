@@ -15,7 +15,7 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import redis "github.com/garyburd/redigo/redis"
+import "github.com/garyburd/redigo/redis"
 
 type ErrorDecayQueue struct {
 	conn            redis.Conn

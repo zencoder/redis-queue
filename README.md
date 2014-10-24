@@ -1,4 +1,4 @@
-redis-queue
+redis-queue [![Circle CI](https://circleci.com/gh/skidder/redis-queue.png?style=badge)](https://circleci.com/gh/skidder/redis-queue)
 ===========
 
 A Go implementation of a FIFO queue backed by Redis

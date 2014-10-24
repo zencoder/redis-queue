@@ -75,6 +75,39 @@ func TestQueuePopSuccessful(t *testing.T) {
 	q.Disconnect()
 }
 
+func TestQueueLengthSuccessful(t *testing.T) {
+	q, _ := QueueConnect(":6379", "rq_test_queue_length")
+
+	l, err := q.Length()
+	if l != 0 {
+		t.Error("Expect length to be 0, was: ", l)
+	}
+	if err != nil {
+		t.Error("Error while getting length of Redis queue", err)
+	}
+
+	q.Push("foo")
+	l, err = q.Length()
+
+	if l != 1 {
+		t.Error("Expect length to be 1, was: ", l)
+	}
+	if err != nil {
+		t.Error("Error while getting length of Redis queue", err)
+	}
+
+	q.Pop(1)
+	l, err = q.Length()
+	if l != 0 {
+		t.Error("Expect length to be 0, was: ", l)
+	}
+	if err != nil {
+		t.Error("Error while getting length of Redis queue", err)
+	}
+
+	q.Disconnect()
+}
+
 func BenchmarkQueueConnectDisconnect(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		q, _ := QueueConnect(":6379", "rq_test_queue")
@@ -83,9 +116,19 @@ func BenchmarkQueueConnectDisconnect(b *testing.B) {
 }
 
 func BenchmarkQueuePush(b *testing.B) {
-	q, _ := QueueConnect(":6379", "rq_test_queue")
+	q, _ := QueueConnect(":6379", "rq_test_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
 	}
+	q.Disconnect()
+}
+
+func BenchmarkQueueLength(b *testing.B) {
+	q, _ := QueueConnect(":6379", "rq_test_queue_length_bench")
+	q.Push("foo")
+	for i := 0; i < b.N; i++ {
+		q.Length()
+	}
+	q.Pop(1)
 	q.Disconnect()
 }

@@ -25,7 +25,7 @@ package main
 import "flag"
 import "fmt"
 import "log"
-import rq "github.com/skidder/redis-queue/rq"
+import "github.com/skidder/redis-queue/rq"
 
 var (
 	redisServer = flag.String("redisServer", ":6379", "Hostname and port for the Redis server")
@@ -38,16 +38,16 @@ func main() {
 	fmt.Printf("redisServer: %s\n", *redisServer)
 	fmt.Printf("redisPassword: %s\n", *redisPassword)
 
+	pool := rq.newPool(":6379")
+	defer pool.Close()
+
 	queue_name := "example"
-	q, err := rq.Connect(*redisServer, queue_name)
+	q, err := rq.QueueConnect(pool, queue_name)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// ensure the connection is closed on exit
-	defer q.Disconnect()
-
-	// push a simple value to the queue
+ 	// push a simple value to the queue
 	q.Push("bar")
 	for {
 		// print queue length
@@ -72,31 +72,30 @@ package main
 
 import "fmt"
 import "log"
-import rq "github.com/skidder/redis-queue/rq"
+import "github.com/skidder/redis-queue/rq"
 
 func main() {
-	addresses := make([]string, 2)
-	addresses[0] = ":7777"
-	addresses[1] = ":8777"
+	pool1 := rq.newPool(":7777")
+	defer pool1.Close()
+
+	pool2 := rq.newPool(":8777")
+	defer pool2.Close()
 
 	queue_name := "example"
-	queue, error := rq.MultiQueueConnect(addresses, queue_name)
+	q, err := rq.MultiQueueConnect([]redis.Pool{*pool1, *pool2}, queue_name)
 	if error != nil {
 		log.Fatal(error)
 	}
 
-	// ensure the connection is closed on exit
-	defer queue.MultiQueueDisconnect()
-
 	// push a simple value to the queue
-	queue.MultiPush("bar")
+	q.Push("bar")
 	for {
 		// print queue length
-		length  := queue.MultiLength()
+		length  := q.Length()
 		fmt.Printf("%s: length: %d\n", queue_name, length)
 
 		// remove an item from the queue
-		rep, _ := queue.MultiPop(1)
+		rep, _ := q.Pop(1)
 		if rep != "" {
 			fmt.Printf("Received message: %s\n", rep)
 		} else {

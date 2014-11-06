@@ -15,14 +15,34 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import "github.com/garyburd/redigo/redis"
+import (
+	"github.com/garyburd/redigo/redis"
+	"strings"
+	"time"
+)
 
-type ErrorDecayQueue struct {
-	pooledConnection redis.Pool
-	errorRating      float64
-	errorRatingTime  int64
-}
+func newPool(connectString string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			urlParts := strings.Split(connectString, "/")
+			c, err := redis.Dial("tcp", urlParts[0])
+			if err != nil {
+				return nil, err
+			}
 
-func (queue *ErrorDecayQueue) QueueError() {
-	queue.errorRating = queue.errorRating + 0.1
+			if len(urlParts) == 2 {
+				selectErr := c.Send("SELECT", urlParts[1])
+				if selectErr != nil {
+					return nil, selectErr
+				}
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }

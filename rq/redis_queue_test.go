@@ -20,39 +20,43 @@ import (
 )
 
 func TestQueueConnectSuccessful(t *testing.T) {
-	q, err := QueueConnect(":6379", "rq_test_queue")
+	pool := newPool(":6379")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue")
+
+	_, err := q.Length()
 	if err != nil {
 		t.Error("Error while connecting to Redis", err)
 	}
-	q.Disconnect()
 }
 
 func TestQueueConnectFailure(t *testing.T) {
-	_, err := QueueConnect(":123", "rq_test_queue")
-	if err == nil {
-		t.Error("Expected error connecting to Redis")
-	}
-}
+	pool := newPool(":123")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue")
 
-func TestQueueDisconnectSuccessful(t *testing.T) {
-	q, err := QueueConnect(":6379", "rq_test_queue")
-	q.Disconnect()
-	if err != nil {
-		t.Error("Error while disconnecting from Redis", err)
+	_, err := q.Length()
+	if err == nil {
+		t.Error("Error while connecting to Redis", err)
 	}
 }
 
 func TestQueuePushSuccessful(t *testing.T) {
-	q, _ := QueueConnect(":6379", "rq_test_queue")
+	pool := newPool(":6379")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue")
+
 	err := q.Push("foo")
 	if err != nil {
 		t.Error("Error while pushing to Redis queue", err)
 	}
-	q.Disconnect()
 }
 
 func TestQueuePopSuccessful(t *testing.T) {
-	q, _ := QueueConnect(":6379", "rq_test_pop_queue")
+	pool := newPool(":6379")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue_pushpop")
+
 	q.Push("foo")
 	q.Push("bar")
 
@@ -73,57 +77,25 @@ func TestQueuePopSuccessful(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error: ", err)
 	}
-	q.Disconnect()
-}
-
-func TestQueueLengthSuccessful(t *testing.T) {
-	q, _ := QueueConnect(":6379", "rq_test_queue_length")
-
-	l, err := q.Length()
-	if l != 0 {
-		t.Error("Expect length to be 0, was: ", l)
-	}
-	if err != nil {
-		t.Error("Error while getting length of Redis queue", err)
-	}
-
-	q.Push("foo")
-	l, err = q.Length()
-
-	if l != 1 {
-		t.Error("Expect length to be 1, was: ", l)
-	}
-	if err != nil {
-		t.Error("Error while getting length of Redis queue", err)
-	}
-
-	q.Pop(1)
-	l, err = q.Length()
-	if l != 0 {
-		t.Error("Expect length to be 0, was: ", l)
-	}
-	if err != nil {
-		t.Error("Error while getting length of Redis queue", err)
-	}
-
-	q.Disconnect()
 }
 
 func BenchmarkQueuePushPop(b *testing.B) {
-	q, _ := QueueConnect(":6379", "rq_test_queue_pushpop_bench")
+	pool := newPool(":6379")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
 		q.Pop(1)
 	}
-	q.Disconnect()
 }
 
 func BenchmarkQueueLength(b *testing.B) {
-	q, _ := QueueConnect(":6379", "rq_test_queue_length_bench")
+	pool := newPool(":6379")
+	defer pool.Close()
+	q := QueueConnect(pool, "rq_test_queue_length_bench")
 	q.Push("foo")
 	for i := 0; i < b.N; i++ {
 		q.Length()
 	}
 	q.Pop(1)
-	q.Disconnect()
 }

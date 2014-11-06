@@ -15,31 +15,28 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import redis "github.com/garyburd/redigo/redis"
+import "github.com/garyburd/redigo/redis"
 
 type Queue struct {
-	conn redis.Conn
-	key  string
+	pooledConnection *redis.Pool
+	key              string
 }
 
 // Connect to the Redis server at the specified address and create a queue
 // corresponding to the given key
-func QueueConnect(address string, key string) (Queue, error) {
-	conn, error := redis.Dial("tcp", address)
-	return Queue{conn: conn, key: key}, error
-}
-
-// Close the Redis connection
-func (queue *Queue) Disconnect() error {
-	return queue.conn.Close()
+func QueueConnect(pooledConnection *redis.Pool, key string) Queue {
+	return Queue{pooledConnection: pooledConnection, key: key}
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied
 // key and value.  An error will be returned if the operation failed.
 func (queue *Queue) Push(value string) error {
-	err := queue.conn.Send("RPUSH", queue.key, value)
+	c := queue.pooledConnection.Get()
+	defer c.Close()
+
+	err := c.Send("RPUSH", queue.key, value)
 	if err == nil {
-		return queue.conn.Flush()
+		return c.Flush()
 	} else {
 		return err
 	}
@@ -48,7 +45,10 @@ func (queue *Queue) Push(value string) error {
 // Pop will perform a blocking left-pop from a Redis list/queue with the supplied
 // key.  An error will be returned if the operation failed.
 func (queue *Queue) Pop(timeout int) (string, error) {
-	rep, err := redis.Strings(queue.conn.Do("BLPOP", queue.key, timeout))
+	c := queue.pooledConnection.Get()
+	defer c.Close()
+
+	rep, err := redis.Strings(c.Do("BLPOP", queue.key, timeout))
 	if err == nil {
 		return rep[1], nil
 	} else {
@@ -58,7 +58,10 @@ func (queue *Queue) Pop(timeout int) (string, error) {
 
 // Length will return the number of items in the specified list/queue
 func (queue *Queue) Length() (int, error) {
-	rep, err := redis.Int(queue.conn.Do("LLEN", queue.key))
+	c := queue.pooledConnection.Get()
+	defer c.Close()
+
+	rep, err := redis.Int(c.Do("LLEN", queue.key))
 	if err == nil {
 		return rep, nil
 	} else {

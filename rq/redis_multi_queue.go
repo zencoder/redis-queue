@@ -33,7 +33,7 @@ var noQueuesAvailableError = errors.New("No queues available")
 // Connect opens a connection to a Redis server and returns the connection.
 // The connection should be closed by invoking Disconnect(conn),
 // likely with defer.
-func MultiQueueConnect(pool []*redis.Pool, key string) (MultiQueue, error) {
+func MultiQueueConnect(pool []*redis.Pool, key string) (*MultiQueue, error) {
 	queues := []*ErrorDecayQueue{}
 	for _, pooledConnection := range pool {
 		queue := &ErrorDecayQueue{
@@ -43,7 +43,7 @@ func MultiQueueConnect(pool []*redis.Pool, key string) (MultiQueue, error) {
 		}
 		queues = append(queues, queue)
 	}
-	return MultiQueue{key: key, queues: queues}, nil
+	return &MultiQueue{key: key, queues: queues}, nil
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied

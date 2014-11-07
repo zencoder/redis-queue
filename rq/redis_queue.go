@@ -24,8 +24,8 @@ type Queue struct {
 
 // Connect to the Redis server at the specified address and create a queue
 // corresponding to the given key
-func QueueConnect(pooledConnection *redis.Pool, key string) Queue {
-	return Queue{pooledConnection: pooledConnection, key: key}
+func QueueConnect(pooledConnection *redis.Pool, key string) *Queue {
+	return &Queue{pooledConnection: pooledConnection, key: key}
 }
 
 // Push will perform a right-push onto a Redis list/queue with the supplied

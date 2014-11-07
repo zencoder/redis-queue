@@ -21,29 +21,29 @@ import (
 )
 
 func TestMultiQueueConnectOneHostSuccessful(t *testing.T) {
-	pool := newPool(":6379")
+	pool := NewPool(":6379")
 	defer pool.Close()
-	_, err := MultiQueueConnect([]redis.Pool{*pool}, "rq_test_queue")
+	_, err := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_queue")
 	if err != nil {
 		t.Error("Error while connecting to Redis", err)
 	}
 }
 
 func TestMultiQueueConnectMultipleHostSuccessful(t *testing.T) {
-	pool1 := newPool(":6379")
+	pool1 := NewPool(":6379")
 	defer pool1.Close()
-	pool2 := newPool(":6379")
+	pool2 := NewPool(":6379")
 	defer pool2.Close()
-	_, err := MultiQueueConnect([]redis.Pool{*pool1, *pool2}, "rq_test_queue")
+	_, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue")
 	if err != nil {
 		t.Error("Error while connecting to Redis", err)
 	}
 }
 
 func TestMultiQueueConnectFailure(t *testing.T) {
-	pool := newPool(":123")
+	pool := NewPool(":123")
 	defer pool.Close()
-	q, _ := MultiQueueConnect([]redis.Pool{*pool}, "rq_test_queue")
+	q, _ := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_queue")
 	_, err := q.Length()
 	if err == nil {
 		t.Error("Expected error connecting to Redis")
@@ -51,11 +51,11 @@ func TestMultiQueueConnectFailure(t *testing.T) {
 }
 
 func TestMultiQueuePushSuccessful(t *testing.T) {
-	pool1 := newPool(":6379")
+	pool1 := NewPool(":6379")
 	defer pool1.Close()
-	pool2 := newPool(":6379")
+	pool2 := NewPool(":6379")
 	defer pool2.Close()
-	q, _ := MultiQueueConnect([]redis.Pool{*pool1, *pool2}, "rq_test_pop_queue")
+	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_pop_queue")
 
 	err := q.Push("foo")
 	if err != nil {
@@ -64,11 +64,11 @@ func TestMultiQueuePushSuccessful(t *testing.T) {
 }
 
 func TestMultiQueuePopSuccessful(t *testing.T) {
-	pool1 := newPool(":6379")
+	pool1 := NewPool(":6379")
 	defer pool1.Close()
-	pool2 := newPool(":6379")
+	pool2 := NewPool(":6379")
 	defer pool2.Close()
-	q, err := MultiQueueConnect([]redis.Pool{*pool1, *pool2}, "rq_test_multi_pop_queue")
+	q, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_pop_queue")
 	q.Push("foo")
 	q.Push("bar")
 
@@ -91,9 +91,9 @@ func TestMultiQueuePopSuccessful(t *testing.T) {
 }
 
 func TestMultiQueueLengthSuccessful(t *testing.T) {
-	pool := newPool(":6379")
+	pool := NewPool(":6379")
 	defer pool.Close()
-	q, _ := MultiQueueConnect([]redis.Pool{*pool}, "rq_test_multiqueue_length")
+	q, _ := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_multiqueue_length")
 
 	l, err := q.Length()
 	if l != 0 {
@@ -124,11 +124,11 @@ func TestMultiQueueLengthSuccessful(t *testing.T) {
 }
 
 func BenchmarkMultiQueuePushPop(b *testing.B) {
-	pool1 := newPool(":6379")
+	pool1 := NewPool(":6379")
 	defer pool1.Close()
-	pool2 := newPool(":6379")
+	pool2 := NewPool(":6379")
 	defer pool2.Close()
-	q, _ := MultiQueueConnect([]redis.Pool{*pool1, *pool2}, "rq_test_multi_queue_pushpop_bench")
+	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
 		q.Pop(1)
@@ -136,11 +136,11 @@ func BenchmarkMultiQueuePushPop(b *testing.B) {
 }
 
 func BenchmarkMultiQueueLength(b *testing.B) {
-	pool1 := newPool(":6379")
+	pool1 := NewPool(":6379")
 	defer pool1.Close()
-	pool2 := newPool(":6379")
+	pool2 := NewPool(":6379")
 	defer pool2.Close()
-	q, _ := MultiQueueConnect([]redis.Pool{*pool1, *pool2}, "rq_test_queue_length_bench")
+	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue_length_bench")
 	q.Push("foo")
 	for i := 0; i < b.N; i++ {
 		q.Length()

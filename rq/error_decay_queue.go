@@ -18,7 +18,7 @@ package rq
 import "github.com/garyburd/redigo/redis"
 
 type ErrorDecayQueue struct {
-	pooledConnection redis.Pool
+	pooledConnection *redis.Pool
 	errorRating      float64
 	errorRatingTime  int64
 }

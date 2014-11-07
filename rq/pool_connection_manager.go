@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-func newPool(connectString string) *redis.Pool {
+func NewPool(connectString string) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,

@@ -23,9 +23,9 @@ import (
 
 func NewPool(connectString string, maxIdle int, maxActive int, idleTime time.Duration) *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     maxIdle,
-		MaxActive:   maxActive,
-		IdleTimeout: idleTime,
+		MaxIdle:     15,
+		MaxActive:   0,
+		IdleTimeout: 240 * time.Second,
 		Dial: func() (redis.Conn, error) {
 			urlParts := strings.Split(connectString, "/")
 			c, err := redis.Dial("tcp", urlParts[0])

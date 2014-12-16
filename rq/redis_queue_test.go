@@ -17,10 +17,11 @@ package rq
 
 import (
 	"testing"
+	"time"
 )
 
 func TestQueueConnectSuccessful(t *testing.T) {
-	pool := NewPool(":6379")
+	pool := CreatePool()
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue")
 
@@ -31,7 +32,7 @@ func TestQueueConnectSuccessful(t *testing.T) {
 }
 
 func TestQueueConnectFailure(t *testing.T) {
-	pool := NewPool(":123")
+	pool := NewPool(":123", 1, 1, 240*time.Second)
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue")
 
@@ -42,7 +43,7 @@ func TestQueueConnectFailure(t *testing.T) {
 }
 
 func TestQueuePushSuccessful(t *testing.T) {
-	pool := NewPool(":6379")
+	pool := CreatePool()
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue")
 
@@ -53,7 +54,7 @@ func TestQueuePushSuccessful(t *testing.T) {
 }
 
 func TestQueuePopSuccessful(t *testing.T) {
-	pool := NewPool(":6379")
+	pool := CreatePool()
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue_pushpop")
 
@@ -80,7 +81,7 @@ func TestQueuePopSuccessful(t *testing.T) {
 }
 
 func BenchmarkQueuePushPop(b *testing.B) {
-	pool := NewPool(":6379")
+	pool := CreatePool()
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
@@ -90,7 +91,7 @@ func BenchmarkQueuePushPop(b *testing.B) {
 }
 
 func BenchmarkQueueLength(b *testing.B) {
-	pool := NewPool(":6379")
+	pool := CreatePool()
 	defer pool.Close()
 	q := QueueConnect(pool, "rq_test_queue_length_bench")
 	q.Push("foo")

@@ -17,14 +17,16 @@ package rq
 
 import (
 	"github.com/garyburd/redigo/redis"
+	"log"
 	"strings"
 	"time"
 )
 
 func NewPool(connectString string, maxIdle int, maxActive int, idleTime time.Duration) *redis.Pool {
-	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
+	pool := redis.Pool{
+		MaxIdle:     maxIdle,
+		MaxActive:   maxActive,
+		IdleTimeout: idleTime,
 		Dial: func() (redis.Conn, error) {
 			urlParts := strings.Split(connectString, "/")
 			c, err := redis.Dial("tcp", urlParts[0])
@@ -45,4 +47,6 @@ func NewPool(connectString string, maxIdle int, maxActive int, idleTime time.Dur
 			return err
 		},
 	}
+	log.Println("Pool: maxIdle=%d, idleTimeOut=%d", pool.MaxIdle, pool.IdleTimeout)
+	return &pool
 }

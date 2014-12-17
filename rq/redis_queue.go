@@ -42,7 +42,7 @@ func (queue *Queue) Push(value string) error {
 	}
 }
 
-// Pop will perform a blocking right-pop from a Redis list/queue with the 
+// Pop will perform a blocking right-pop from a Redis list/queue with the
 // supplied key.  An error will be returned if the operation failed.
 func (queue *Queue) Pop(timeout int) (string, error) {
 	c := queue.pooledConnection.Get()

@@ -17,7 +17,6 @@ package rq
 
 import (
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"strings"
 	"time"
 )
@@ -47,6 +46,5 @@ func NewPool(connectString string, maxIdle int, maxActive int, idleTime time.Dur
 			return err
 		},
 	}
-	log.Println("Pool: maxIdle=%d, idleTimeOut=%d", pool.MaxIdle, pool.IdleTimeout)
 	return &pool
 }

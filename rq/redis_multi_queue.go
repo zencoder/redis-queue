@@ -46,7 +46,7 @@ func MultiQueueConnect(pool []*redis.Pool, key string) (*MultiQueue, error) {
 	return &MultiQueue{key: key, queues: queues}, nil
 }
 
-// Push will perform a right-push onto a Redis list/queue with the supplied
+// Push will perform a left-push onto a Redis list/queue with the supplied
 // key and value.  An error will be returned if the operation failed.
 func (multi_queue *MultiQueue) Push(value string) error {
 	q, err := multi_queue.SelectHealthyQueue()
@@ -57,7 +57,7 @@ func (multi_queue *MultiQueue) Push(value string) error {
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
-	push_error := conn.Send("RPUSH", multi_queue.key, value)
+	push_error := conn.Send("LPUSH", multi_queue.key, value)
 	if push_error == nil {
 		return conn.Flush()
 	} else {
@@ -66,7 +66,7 @@ func (multi_queue *MultiQueue) Push(value string) error {
 	}
 }
 
-// Pop will perform a blocking left-pop from a Redis list/queue with the supplied
+// Pop will perform a blocking right-pop from a Redis list/queue with the supplied
 // key.  An error will be returned if the operation failed.
 func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	q, err := multi_queue.SelectHealthyQueue()
@@ -77,7 +77,7 @@ func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
-	rep, err := conn.Do("BLPOP", multi_queue.key, timeout)
+	rep, err := conn.Do("BRPOP", multi_queue.key, timeout)
 	if err == nil {
 		r, err := redis.Strings(rep, err)
 		if err == nil {

@@ -34,7 +34,7 @@ func (queue *Queue) Push(value string) error {
 	c := queue.pooledConnection.Get()
 	defer c.Close()
 
-	err := c.Send("RPUSH", queue.key, value)
+	err := c.Send("LPUSH", queue.key, value)
 	if err == nil {
 		return c.Flush()
 	} else {
@@ -48,7 +48,7 @@ func (queue *Queue) Pop(timeout int) (string, error) {
 	c := queue.pooledConnection.Get()
 	defer c.Close()
 
-	rep, err := redis.Strings(c.Do("BLPOP", queue.key, timeout))
+	rep, err := redis.Strings(c.Do("BRPOP", queue.key, timeout))
 	if err == nil {
 		return rep[1], nil
 	} else {

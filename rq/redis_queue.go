@@ -28,7 +28,7 @@ func QueueConnect(pooledConnection *redis.Pool, key string) *Queue {
 	return &Queue{pooledConnection: pooledConnection, key: key}
 }
 
-// Push will perform a right-push onto a Redis list/queue with the supplied
+// Push will perform a left-push onto a Redis list/queue with the supplied
 // key and value.  An error will be returned if the operation failed.
 func (queue *Queue) Push(value string) error {
 	c := queue.pooledConnection.Get()
@@ -42,8 +42,8 @@ func (queue *Queue) Push(value string) error {
 	}
 }
 
-// Pop will perform a blocking left-pop from a Redis list/queue with the supplied
-// key.  An error will be returned if the operation failed.
+// Pop will perform a blocking right-pop from a Redis list/queue with the 
+// supplied key.  An error will be returned if the operation failed.
 func (queue *Queue) Pop(timeout int) (string, error) {
 	c := queue.pooledConnection.Get()
 	defer c.Close()

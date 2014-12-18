@@ -57,13 +57,11 @@ func (multi_queue *MultiQueue) Push(value string) error {
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
-	push_error := conn.Send("LPUSH", multi_queue.key, value)
-	if push_error == nil {
-		return conn.Flush()
-	} else {
+	_, err = conn.Do("LPUSH", multi_queue.key, value)
+	if err != nil {
 		q.QueueError()
-		return push_error
 	}
+	return err
 }
 
 // Pop will perform a blocking right-pop from a Redis list/queue with the supplied
@@ -77,13 +75,9 @@ func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
-	rep, err := conn.Do("BRPOP", multi_queue.key, timeout)
+	r, err := redis.Strings(conn.Do("BRPOP", multi_queue.key, timeout))
 	if err == nil {
-		r, err := redis.Strings(rep, err)
-		if err == nil {
-			return r[1], nil
-		}
-		return "", err
+		return r[1], nil
 	} else {
 		q.QueueError()
 		return "", err

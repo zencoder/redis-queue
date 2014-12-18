@@ -60,6 +60,7 @@ func (multi_queue *MultiQueue) Push(value string) error {
 
 	_, err = conn.Do("LPUSH", multi_queue.key, value)
 	if err != nil {
+		log.Println("Push error: ", err)
 		q.QueueError()
 	}
 	return err
@@ -80,6 +81,7 @@ func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	if err == nil {
 		return r[1], nil
 	} else {
+		log.Println("Pop error: ", err)
 		q.QueueError()
 		return "", err
 	}

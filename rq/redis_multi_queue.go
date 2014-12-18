@@ -106,24 +106,13 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 	healthyQueues := []*ErrorDecayQueue{}
 	for _, q := range mq.queues {
 		timeDelta := now - q.errorRatingTime
-		updatedErrorRating := q.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
-
-		if updatedErrorRating < 0.1 {
-			if q.errorRating >= 0.1 {
-				// transitioning the queue out of an unhealthy state, try issuing a ping
-				conn := q.pooledConnection.Get()
-				defer conn.Close()
-
-				_, err := conn.Do("PING")
-				if err == nil {
-					healthyQueues = append(healthyQueues, q)
-				}
-			} else {
-				healthyQueues = append(healthyQueues, q)
-			}
-		}
+		q.errorRating = q.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
 		q.errorRatingTime = time.Now().Unix()
-		q.errorRating = updatedErrorRating
+
+		if q.errorRating < 0.1 {
+			healthyQueues = append(healthyQueues, q)
+		}
+
 	}
 	return healthyQueues
 }

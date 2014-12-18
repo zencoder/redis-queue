@@ -124,7 +124,7 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 					healthyQueues = append(healthyQueues, q)
 				} else {
 					log.Println("Unhealthy queue produced error while issuing a ping", err)
-				}					
+				}
 			} else {
 				log.Println("Already healthy, all good")
 				healthyQueues = append(healthyQueues, q)

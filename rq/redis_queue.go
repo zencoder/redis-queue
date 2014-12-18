@@ -34,12 +34,8 @@ func (queue *Queue) Push(value string) error {
 	c := queue.pooledConnection.Get()
 	defer c.Close()
 
-	err := c.Send("LPUSH", queue.key, value)
-	if err == nil {
-		return c.Flush()
-	} else {
-		return err
-	}
+	_, err := c.Do("LPUSH", queue.key, value)
+	return err
 }
 
 // Pop will perform a blocking right-pop from a Redis list/queue with the

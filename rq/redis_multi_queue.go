@@ -122,17 +122,20 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 				if err == nil {
 					log.Println("Transitioning queue to healthy")
 					healthyQueues = append(healthyQueues, q)
+					log.Println("Length of healthyQueues after reassessment: ", len(healthyQueues))
 				} else {
 					log.Println("Unhealthy queue produced error while issuing a ping", err)
 				}
 			} else {
 				log.Println("Already healthy, all good")
 				healthyQueues = append(healthyQueues, q)
+				log.Println("Length of healthyQueues after append for healthy: ", len(healthyQueues))
 			}
 		}
 		q.errorRatingTime = time.Now().Unix()
 		q.errorRating = updatedErrorRating
 	}
+	log.Println("Length of healthyQueues being returned: ", len(healthyQueues))
 	return healthyQueues
 }
 

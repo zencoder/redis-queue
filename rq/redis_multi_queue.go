@@ -59,7 +59,7 @@ func (multi_queue *MultiQueue) Push(value string) error {
 	defer conn.Close()
 
 	_, err = conn.Do("LPUSH", multi_queue.key, value)
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		log.Println("Push error: ", err)
 		q.QueueError()
 	}
@@ -81,8 +81,10 @@ func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 	if err == nil {
 		return r[1], nil
 	} else {
-		log.Println("Pop error: ", err)
-		q.QueueError()
+		if err != redis.ErrNil {
+			log.Println("Pop error: ", err)
+			q.QueueError()
+		}
 		return "", err
 	}
 }

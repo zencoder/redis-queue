@@ -18,7 +18,6 @@ package rq
 import (
 	"errors"
 	"github.com/garyburd/redigo/redis"
-	"log"
 	"math"
 	"math/rand"
 	"time"
@@ -60,7 +59,6 @@ func (multi_queue *MultiQueue) Push(value string) error {
 
 	_, err = conn.Do("LPUSH", multi_queue.key, value)
 	if err != nil && err != redis.ErrNil {
-		log.Println("Push error: ", err)
 		q.QueueError()
 	}
 	return err
@@ -82,7 +80,6 @@ func (multi_queue *MultiQueue) Pop(timeout int) (string, error) {
 		return r[1], nil
 	} else {
 		if err != redis.ErrNil {
-			log.Println("Pop error: ", err)
 			q.QueueError()
 		}
 		return "", err
@@ -114,32 +111,22 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 		updatedErrorRating := q.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
 
 		if updatedErrorRating < 0.1 {
-			log.Println("Updated error rating: ", updatedErrorRating)
 			if q.errorRating >= 0.1 {
-				log.Println("Trying to transition queue, old error rating: ", q.errorRating)
-
 				// transitioning the queue out of an unhealthy state, try issuing a ping
 				conn := q.pooledConnection.Get()
 				defer conn.Close()
 
 				_, err := conn.Do("PING")
 				if err == nil {
-					log.Println("Transitioning queue to healthy")
 					healthyQueues = append(healthyQueues, q)
-					log.Println("Length of healthyQueues after reassessment: ", len(healthyQueues))
-				} else {
-					log.Println("Unhealthy queue produced error while issuing a ping", err)
 				}
 			} else {
-				log.Println("Already healthy, all good")
 				healthyQueues = append(healthyQueues, q)
-				log.Println("Length of healthyQueues after append for healthy: ", len(healthyQueues))
 			}
 		}
 		q.errorRatingTime = time.Now().Unix()
 		q.errorRating = updatedErrorRating
 	}
-	log.Println("Length of healthyQueues being returned: ", len(healthyQueues))
 	return healthyQueues
 }
 
@@ -147,7 +134,6 @@ func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
 	healthyQueues := mq.HealthyQueues()
 	numberOfHealthyQueues := len(healthyQueues)
 
-	log.Println("Number of healthy queues: ", numberOfHealthyQueues)
 	index := 0
 	if numberOfHealthyQueues == 0 {
 		numberOfQueues := len(mq.queues)
@@ -156,11 +142,9 @@ func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
 		}
 		index = rand.Intn(numberOfQueues)
 
-		log.Println("No healthy queues, using random index: ", index)
 		return mq.queues[index], nil
 	} else if numberOfHealthyQueues > 1 {
 		index = rand.Intn(numberOfHealthyQueues)
 	}
-	log.Println("Using queue index: ", index)
 	return healthyQueues[index], nil
 }

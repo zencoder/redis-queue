@@ -22,7 +22,7 @@ import (
 )
 
 func TestMultiQueueConnectOneHostSuccessful(t *testing.T) {
-	pool := CreatePool()
+	pool := createPool()
 	defer pool.Close()
 	_, err := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_queue")
 	if err != nil {
@@ -31,9 +31,9 @@ func TestMultiQueueConnectOneHostSuccessful(t *testing.T) {
 }
 
 func TestMultiQueueConnectMultipleHostSuccessful(t *testing.T) {
-	pool1 := CreatePool()
+	pool1 := createPool()
 	defer pool1.Close()
-	pool2 := CreatePool()
+	pool2 := createPool()
 	defer pool2.Close()
 	_, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue")
 	if err != nil {
@@ -52,9 +52,9 @@ func TestMultiQueueConnectFailure(t *testing.T) {
 }
 
 func TestMultiQueuePushSuccessful(t *testing.T) {
-	pool1 := CreatePool()
+	pool1 := createPool()
 	defer pool1.Close()
-	pool2 := CreatePool()
+	pool2 := createPool()
 	defer pool2.Close()
 	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_pop_queue")
 
@@ -65,10 +65,16 @@ func TestMultiQueuePushSuccessful(t *testing.T) {
 }
 
 func TestMultiQueuePopSuccessful(t *testing.T) {
-	pool1 := CreatePool()
+	pool1 := createPool()
 	defer pool1.Close()
-	pool2 := CreatePool()
+	pool2 := createPool()
 	defer pool2.Close()
+
+	var e error
+	if e = deleteKey(pool1, "rq_test_multi_pop_queue"); e != nil {
+		t.Error("Unable to delete key in test setup")
+	}
+
 	q, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_pop_queue")
 	q.Push("foo")
 	q.Push("bar")
@@ -89,11 +95,21 @@ func TestMultiQueuePopSuccessful(t *testing.T) {
 	if err != nil {
 		t.Error("Unexpected error: ", err)
 	}
+
+	if e = deleteKey(pool1, "rq_test_multi_pop_queue"); e != nil {
+		t.Error("Unable to delete key in test cleanup")
+	}
 }
 
 func TestMultiQueueLengthSuccessful(t *testing.T) {
-	pool := CreatePool()
+	pool := createPool()
 	defer pool.Close()
+
+	var e error
+	if e = deleteKey(pool, "rq_test_multiqueue_length"); e != nil {
+		t.Error("Unable to delete key in test setup")
+	}
+
 	q, _ := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_multiqueue_length")
 
 	l, err := q.Length()
@@ -122,33 +138,69 @@ func TestMultiQueueLengthSuccessful(t *testing.T) {
 	if err != nil {
 		t.Error("Error while getting length of Redis queue", err)
 	}
+
+	if e = deleteKey(pool, "rq_test_multiqueue_length"); e != nil {
+		t.Error("Unable to delete key in test cleanup")
+	}
 }
 
 func BenchmarkMultiQueuePushPop(b *testing.B) {
-	pool1 := CreatePool()
+	pool1 := createPool()
 	defer pool1.Close()
-	pool2 := CreatePool()
+	pool2 := createPool()
 	defer pool2.Close()
+
+	var e error
+	if e = deleteKey(pool1, "rq_test_multi_queue_pushpop_bench"); e != nil {
+		b.Error("Unable to delete key in test setup")
+	}
+
 	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
 		q.Pop(1)
 	}
+
+	if e = deleteKey(pool1, "rq_test_multi_queue_pushpop_bench"); e != nil {
+		b.Error("Unable to delete key in test cleanup")
+	}
 }
 
 func BenchmarkMultiQueueLength(b *testing.B) {
-	pool1 := CreatePool()
+	pool1 := createPool()
 	defer pool1.Close()
-	pool2 := CreatePool()
+	pool2 := createPool()
 	defer pool2.Close()
+
+	var e error
+	if e = deleteKey(pool1, "rq_test_queue_length_bench"); e != nil {
+		b.Error("Unable to delete key in test setup")
+	}
+
 	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue_length_bench")
 	q.Push("foo")
 	for i := 0; i < b.N; i++ {
 		q.Length()
 	}
 	q.Pop(1)
+
+	if e = deleteKey(pool1, "rq_test_queue_length_bench"); e != nil {
+		b.Error("Unable to delete key in test cleanup")
+	}
 }
 
-func CreatePool() *redis.Pool {
-	return NewPool(":6379", 1, 1, 240*time.Second)
+func deleteKey(pool *redis.Pool, key string) error {
+	conn := pool.Get()
+	defer conn.Close()
+
+	_, err := conn.Do("DEL", key)
+	return err
+}
+
+func createPoolWithConnectString(connectString string) *redis.Pool {
+	return NewPool(connectString, 1, 1, 240*time.Second)
+}
+
+func createPool() *redis.Pool {
+	return createPoolWithConnectString(":6379")
 }

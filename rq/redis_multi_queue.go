@@ -25,9 +25,9 @@ import (
 )
 
 type MultiQueue struct {
-	key            string
+	key    string
 	numberOfQueues int
-	queues         []*ErrorDecayQueue
+	queues []*ErrorDecayQueue
 }
 
 var noQueuesAvailableError = errors.New("No queues available")

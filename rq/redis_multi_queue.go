@@ -145,7 +145,7 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 }
 
 func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
-	index := rand.Intn(mq.numberOfQueues)
+	index = rand.Intn(mq.numberOfQueues)
 	log.Println("Using queue index: ", index)
 	return mq.queues[index], nil
 }

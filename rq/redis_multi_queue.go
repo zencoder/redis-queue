@@ -26,7 +26,6 @@ import (
 
 type MultiQueue struct {
 	key    string
-	numberOfQueues int
 	queues []*ErrorDecayQueue
 }
 
@@ -45,7 +44,7 @@ func MultiQueueConnect(pool []*redis.Pool, key string) (*MultiQueue, error) {
 		}
 		queues = append(queues, queue)
 	}
-	return &MultiQueue{key: key, queues: queues, numberOfQueues: len(queues)}, nil
+	return &MultiQueue{key: key, queues: queues}, nil
 }
 
 // Push will perform a left-push onto a Redis list/queue with the supplied
@@ -145,7 +144,23 @@ func (mq *MultiQueue) HealthyQueues() []*ErrorDecayQueue {
 }
 
 func (mq *MultiQueue) SelectHealthyQueue() (*ErrorDecayQueue, error) {
-	index = rand.Intn(mq.numberOfQueues)
+	healthyQueues := mq.HealthyQueues()
+	numberOfHealthyQueues := len(healthyQueues)
+
+	log.Println("Number of healthy queues: ", numberOfHealthyQueues)
+	index := 0
+	if numberOfHealthyQueues == 0 {
+		numberOfQueues := len(mq.queues)
+		if numberOfQueues == 0 {
+			return nil, noQueuesAvailableError
+		}
+		index = rand.Intn(numberOfQueues)
+
+		log.Println("No healthy queues, using random index: ", index)
+		return mq.queues[index], nil
+	} else if numberOfHealthyQueues > 1 {
+		index = rand.Intn(numberOfHealthyQueues)
+	}
 	log.Println("Using queue index: ", index)
-	return mq.queues[index], nil
+	return healthyQueues[index], nil
 }

@@ -1,14 +1,19 @@
-GO ?= go	
-GOPATH := $(CURDIR):$(GOPATH)
-export GOPATH
+GO ?= godep go
+ifdef CIRCLE_ARTIFACTS
+  COVERAGEDIR = $(CIRCLE_ARTIFACTS)
+endif
 
-all: fmt test
-
+all: test
+godep:
+	go get github.com/tools/godep
+godep-save:
+	godep save ./...
 fmt:
-	cd $(CURDIR)/rq; $(GO) fmt
-
+	$(GO) fmt ./...
 test:
-	cd $(CURDIR)/rq; $(GO) test .
-
+	$(GO) test ./...
 bench:
-	cd $(CURDIR)/rq; $(GO) test -bench .
+	$(GO) test -bench ./...
+clean:
+	$(GO) clean
+	

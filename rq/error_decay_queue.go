@@ -15,14 +15,22 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import "github.com/garyburd/redigo/redis"
+import (
+	"sync"
+
+	"github.com/garyburd/redigo/redis"
+)
 
 type ErrorDecayQueue struct {
+	mu               sync.Mutex
 	pooledConnection *redis.Pool
 	errorRating      float64
 	errorRatingTime  int64
 }
 
 func (e *ErrorDecayQueue) QueueError() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	e.errorRating = e.errorRating + 0.1
 }

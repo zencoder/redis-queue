@@ -17,7 +17,6 @@ package rq
 
 import (
 	"errors"
-	"log"
 	"math"
 	"math/rand"
 	"sync"
@@ -56,17 +55,10 @@ func (m *MultiQueue) Push(value string) (err error) {
 		return err
 	}
 
-	if q == nil {
-		log.Println("selected queue is nil")
-	}
-	if q.pooledConnection == nil {
-		log.Println("selected connection is nil")
-	}
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
 	if _, err = conn.Do("LPUSH", m.key, value); err != nil && err != redis.ErrNil {
-		// flag the queue as having encountered an error
 		q.QueueError()
 	}
 	return
@@ -85,7 +77,7 @@ func (m *MultiQueue) Pop(timeout int) (message string, err error) {
 
 	var r []string
 	if r, err = redis.Strings(conn.Do("BRPOP", m.key, timeout)); err == nil {
-		if len(r) > 0 {
+		if len(r) >= 2 {
 			message = r[1]
 		}
 	} else {
@@ -128,8 +120,7 @@ func (m *MultiQueue) HealthyQueues() (healthyQueues []*ErrorDecayQueue) {
 				conn := q.pooledConnection.Get()
 				defer conn.Close()
 
-				_, err := conn.Do("PING")
-				if err == nil {
+				if _, err := conn.Do("PING"); err == nil {
 					healthyQueues = append(healthyQueues, q)
 				}
 			} else {

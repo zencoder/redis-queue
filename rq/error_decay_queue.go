@@ -23,6 +23,6 @@ type ErrorDecayQueue struct {
 	errorRatingTime  int64
 }
 
-func (queue *ErrorDecayQueue) QueueError() {
-	queue.errorRating = queue.errorRating + 0.1
+func (e *ErrorDecayQueue) QueueError() {
+	e.errorRating = e.errorRating + 0.1
 }

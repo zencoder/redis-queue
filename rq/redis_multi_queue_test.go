@@ -16,35 +16,30 @@
 package rq
 
 import (
-	"github.com/garyburd/redigo/redis"
 	"testing"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
 )
 
-func TestMultiQueueConnectOneHostSuccessful(t *testing.T) {
+func TestNewMultiQueueOneHostSuccessful(t *testing.T) {
 	pool := createPool()
 	defer pool.Close()
-	_, err := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_queue")
-	if err != nil {
-		t.Error("Error while connecting to Redis", err)
-	}
+	NewMultiQueue([]*redis.Pool{pool}, "rq_test_queue")
 }
 
-func TestMultiQueueConnectMultipleHostSuccessful(t *testing.T) {
+func TestNewMultiQueueMultipleHostSuccessful(t *testing.T) {
 	pool1 := createPool()
 	defer pool1.Close()
 	pool2 := createPool()
 	defer pool2.Close()
-	_, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue")
-	if err != nil {
-		t.Error("Error while connecting to Redis", err)
-	}
+	NewMultiQueue([]*redis.Pool{pool1, pool2}, "rq_test_queue")
 }
 
-func TestMultiQueueConnectFailure(t *testing.T) {
+func TestNewMultiQueueFailure(t *testing.T) {
 	pool := NewPool(":123", 1, 1, 240*time.Second)
 	defer pool.Close()
-	q, _ := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_queue")
+	q := NewMultiQueue([]*redis.Pool{pool}, "rq_test_queue")
 	_, err := q.Length()
 	if err == nil {
 		t.Error("Expected error connecting to Redis")
@@ -56,7 +51,7 @@ func TestMultiQueuePushSuccessful(t *testing.T) {
 	defer pool1.Close()
 	pool2 := createPool()
 	defer pool2.Close()
-	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_pop_queue")
+	q := NewMultiQueue([]*redis.Pool{pool1, pool2}, "rq_test_pop_queue")
 
 	err := q.Push("foo")
 	if err != nil {
@@ -75,12 +70,11 @@ func TestMultiQueuePopSuccessful(t *testing.T) {
 		t.Error("Unable to delete key in test setup")
 	}
 
-	q, err := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_pop_queue")
+	q := NewMultiQueue([]*redis.Pool{pool1, pool2}, "rq_test_multi_pop_queue")
 	q.Push("foo")
 	q.Push("bar")
 
-	var value string
-	value, err = q.Pop(1)
+	value, err := q.Pop(1)
 	if value != "foo" {
 		t.Error("Expected foo but got: ", value)
 	}
@@ -110,7 +104,7 @@ func TestMultiQueueLengthSuccessful(t *testing.T) {
 		t.Error("Unable to delete key in test setup")
 	}
 
-	q, _ := MultiQueueConnect([]*redis.Pool{pool}, "rq_test_multiqueue_length")
+	q := NewMultiQueue([]*redis.Pool{pool}, "rq_test_multiqueue_length")
 
 	l, err := q.Length()
 	if l != 0 {
@@ -155,7 +149,7 @@ func BenchmarkMultiQueuePushPop(b *testing.B) {
 		b.Error("Unable to delete key in test setup")
 	}
 
-	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_multi_queue_pushpop_bench")
+	q := NewMultiQueue([]*redis.Pool{pool1, pool2}, "rq_test_multi_queue_pushpop_bench")
 	for i := 0; i < b.N; i++ {
 		q.Push("foo")
 		q.Pop(1)
@@ -177,7 +171,7 @@ func BenchmarkMultiQueueLength(b *testing.B) {
 		b.Error("Unable to delete key in test setup")
 	}
 
-	q, _ := MultiQueueConnect([]*redis.Pool{pool1, pool2}, "rq_test_queue_length_bench")
+	q := NewMultiQueue([]*redis.Pool{pool1, pool2}, "rq_test_queue_length_bench")
 	q.Push("foo")
 	for i := 0; i < b.N; i++ {
 		q.Length()

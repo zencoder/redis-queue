@@ -46,7 +46,7 @@ func NewMultiQueue(pools map[string]*redis.Pool, queueName string) *MultiQueue {
 func (m *MultiQueue) Push(value string) (err error) {
 	var q *ErrorDecayQueue
 	if q, err = m.SelectHealthyQueue(); err != nil {
-		return err
+		return
 	}
 
 	conn := q.pooledConnection.Get()

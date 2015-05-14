@@ -56,8 +56,10 @@ func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
 	timeDelta := now - e.errorRatingTime
 	updatedErrorRating := e.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
 
-	if updatedErrorRating < 0.1 {
-		if e.errorRating >= 0.1 {
+	if e.errorRating < 0.1 {
+		healthy = true
+	} else {
+		if updatedErrorRating < 0.1 {
 			// transitioning the queue out of an unhealthy state, try issuing a ping
 			conn := e.pooledConnection.Get()
 			defer conn.Close()
@@ -65,8 +67,6 @@ func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
 			if _, err := conn.Do("PING"); err == nil {
 				healthy = true
 			}
-		} else {
-			healthy = true
 		}
 	}
 	e.errorRatingTime = now

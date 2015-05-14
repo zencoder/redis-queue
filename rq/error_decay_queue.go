@@ -15,14 +15,69 @@
 // Package rq provides a simple queue abstraction that is backed by Redis.
 package rq
 
-import "github.com/garyburd/redigo/redis"
+import (
+	"math"
+	"sync"
+	"time"
+
+	"github.com/garyburd/redigo/redis"
+)
 
 type ErrorDecayQueue struct {
+	server           string
+	queueName        string
 	pooledConnection *redis.Pool
 	errorRating      float64
 	errorRatingTime  int64
+
+	mu sync.Mutex
 }
 
-func (queue *ErrorDecayQueue) QueueError() {
-	queue.errorRating = queue.errorRating + 0.1
+func NewErrorDecayQueue(server string, queueName string, pooledConnection *redis.Pool) *ErrorDecayQueue {
+	return &ErrorDecayQueue{
+		server:           server,
+		queueName:        queueName,
+		pooledConnection: pooledConnection,
+		errorRatingTime:  time.Now().Unix(),
+		errorRating:      0.0,
+	}
+}
+
+func (e *ErrorDecayQueue) QueueError() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.errorRating = e.errorRating + 0.1
+}
+
+func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	now := time.Now().Unix()
+	timeDelta := now - e.errorRatingTime
+	updatedErrorRating := e.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
+
+	if e.errorRating < 0.1 {
+		healthy = true
+	} else {
+		if updatedErrorRating < 0.1 {
+			// transitioning the queue out of an unhealthy state, try issuing a ping
+			conn := e.pooledConnection.Get()
+			defer conn.Close()
+
+			if _, err := conn.Do("PING"); err == nil {
+				healthy = true
+			} else {
+				// unsuccessful at using new connection, put it back into an unhealthy state
+				healthy = false
+				updatedErrorRating = e.errorRating + 0.1
+			}
+		} else {
+			healthy = false
+		}
+	}
+	e.errorRatingTime = now
+	e.errorRating = updatedErrorRating
+	return
 }

@@ -17,38 +17,32 @@ package rq
 
 import (
 	"errors"
-	"math"
+	"fmt"
 	"math/rand"
 	"sync"
-	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
 
 type MultiQueue struct {
-	mu     sync.Mutex
-	key    string
-	pools  []*redis.Pool
-	queues []*ErrorDecayQueue
+	mu        sync.Mutex
+	queueName string
+	queues    []*ErrorDecayQueue
 }
 
 var noQueuesAvailableError = errors.New("No queues available")
 
-func NewMultiQueue(pools []*redis.Pool, key string) *MultiQueue {
+func NewMultiQueue(pools map[string]*redis.Pool, queueName string) *MultiQueue {
 	queues := []*ErrorDecayQueue{}
-	for _, pooledConnection := range pools {
-		queue := &ErrorDecayQueue{
-			pooledConnection: pooledConnection,
-			errorRatingTime:  time.Now().Unix(),
-			errorRating:      0.0,
-		}
+	for server, pooledConnection := range pools {
+		queue := NewErrorDecayQueue(server, queueName, pooledConnection)
 		queues = append(queues, queue)
 	}
-	return &MultiQueue{key: key, pools: pools, queues: queues}
+	return &MultiQueue{queueName: queueName, queues: queues}
 }
 
 // Push will perform a left-push onto a Redis list/queue with the supplied
-// key and value.  An error will be returned if the operation failed.
+// queueName and value.  An error will be returned if the operation failed.
 func (m *MultiQueue) Push(value string) (err error) {
 	var q *ErrorDecayQueue
 	if q, err = m.SelectHealthyQueue(); err != nil {
@@ -58,14 +52,16 @@ func (m *MultiQueue) Push(value string) (err error) {
 	conn := q.pooledConnection.Get()
 	defer conn.Close()
 
-	if _, err = conn.Do("LPUSH", m.key, value); err != nil && err != redis.ErrNil {
+	if _, err = conn.Do("LPUSH", m.queueName, value); err != nil && err != redis.ErrNil {
+		previousErrorRating := q.errorRating
 		q.QueueError()
+		err = fmt.Errorf("Recorded error for queue: server=%s, queueName=%s, previous error rating=%f, new error rating=%f", q.server, q.queueName, previousErrorRating, q.errorRating)
 	}
 	return
 }
 
 // Pop will perform a blocking right-pop from a Redis list/queue with the supplied
-// key.  An error will be returned if the operation failed.
+// queueName.  An error will be returned if the operation failed.
 func (m *MultiQueue) Pop(timeout int) (message string, err error) {
 	var q *ErrorDecayQueue
 	if q, err = m.SelectHealthyQueue(); err != nil {
@@ -76,7 +72,7 @@ func (m *MultiQueue) Pop(timeout int) (message string, err error) {
 	defer conn.Close()
 
 	var r []string
-	if r, err = redis.Strings(conn.Do("BRPOP", m.key, timeout)); err == nil {
+	if r, err = redis.Strings(conn.Do("BRPOP", m.queueName, timeout)); err == nil {
 		if len(r) >= 2 {
 			message = r[1]
 		}
@@ -96,7 +92,7 @@ func (m *MultiQueue) Length() (total int, err error) {
 		defer conn.Close()
 
 		var rep int
-		if rep, err = redis.Int(conn.Do("LLEN", m.key)); err != nil {
+		if rep, err = redis.Int(conn.Do("LLEN", m.queueName)); err != nil {
 			return
 		}
 		total = total + rep
@@ -108,27 +104,11 @@ func (m *MultiQueue) HealthyQueues() (healthyQueues []*ErrorDecayQueue) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	now := time.Now().Unix()
 	healthyQueues = make([]*ErrorDecayQueue, 0)
 	for _, q := range m.queues {
-		timeDelta := now - q.errorRatingTime
-		updatedErrorRating := q.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
-
-		if updatedErrorRating < 0.1 {
-			if q.errorRating >= 0.1 {
-				// transitioning the queue out of an unhealthy state, try issuing a ping
-				conn := q.pooledConnection.Get()
-				defer conn.Close()
-
-				if _, err := conn.Do("PING"); err == nil {
-					healthyQueues = append(healthyQueues, q)
-				}
-			} else {
-				healthyQueues = append(healthyQueues, q)
-			}
+		if q.IsHealthy() {
+			healthyQueues = append(healthyQueues, q)
 		}
-		q.errorRatingTime = time.Now().Unix()
-		q.errorRating = updatedErrorRating
 	}
 	return
 }

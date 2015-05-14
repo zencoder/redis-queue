@@ -16,16 +16,31 @@
 package rq
 
 import (
+	"math"
 	"sync"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 )
 
 type ErrorDecayQueue struct {
-	mu               sync.Mutex
+	server           string
+	queueName        string
 	pooledConnection *redis.Pool
 	errorRating      float64
 	errorRatingTime  int64
+
+	mu sync.Mutex
+}
+
+func NewErrorDecayQueue(server string, queueName string, pooledConnection *redis.Pool) *ErrorDecayQueue {
+	return &ErrorDecayQueue{
+		server:           server,
+		queueName:        queueName,
+		pooledConnection: pooledConnection,
+		errorRatingTime:  time.Now().Unix(),
+		errorRating:      0.0,
+	}
 }
 
 func (e *ErrorDecayQueue) QueueError() {
@@ -33,4 +48,28 @@ func (e *ErrorDecayQueue) QueueError() {
 	defer e.mu.Unlock()
 
 	e.errorRating = e.errorRating + 0.1
+}
+
+func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
+	healthy = false
+	now := time.Now().Unix()
+	timeDelta := now - e.errorRatingTime
+	updatedErrorRating := e.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
+
+	if updatedErrorRating < 0.1 {
+		if e.errorRating >= 0.1 {
+			// transitioning the queue out of an unhealthy state, try issuing a ping
+			conn := e.pooledConnection.Get()
+			defer conn.Close()
+
+			if _, err := conn.Do("PING"); err == nil {
+				healthy = true
+			}
+		} else {
+			healthy = true
+		}
+	}
+	e.errorRatingTime = now
+	e.errorRating = updatedErrorRating
+	return
 }

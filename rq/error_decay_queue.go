@@ -51,6 +51,9 @@ func (e *ErrorDecayQueue) QueueError() {
 }
 
 func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	now := time.Now().Unix()
 	timeDelta := now - e.errorRatingTime
 	updatedErrorRating := e.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))

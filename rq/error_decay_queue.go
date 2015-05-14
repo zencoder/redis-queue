@@ -51,7 +51,6 @@ func (e *ErrorDecayQueue) QueueError() {
 }
 
 func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
-	healthy = false
 	now := time.Now().Unix()
 	timeDelta := now - e.errorRatingTime
 	updatedErrorRating := e.errorRating * math.Exp((math.Log(0.5)/10)*float64(timeDelta))
@@ -66,7 +65,13 @@ func (e *ErrorDecayQueue) IsHealthy() (healthy bool) {
 
 			if _, err := conn.Do("PING"); err == nil {
 				healthy = true
+			} else {
+				// unsuccessful at using new connection, put it back into an unhealthy state
+				healthy = false
+				updatedErrorRating = e.errorRating + 0.1
 			}
+		} else {
+			healthy = false
 		}
 	}
 	e.errorRatingTime = now
